@@ -1,17 +1,33 @@
-//
-//  FModCapsule.m
-//  jokerHub
-//
-//  Created by JokerAtBaoFeng on 2018/1/3.
-//  Copyright © 2018年 joker. All rights reserved.
-//
+
 
 #import "FModCapsule.h"
+#include "fmod_studio.hpp"
 #include "fmod.hpp"
 #include "common.h"
 #include "fmod_errors.h"
 
-@interface FModCapsule()
+
+
+const char *GetMediaPath(const char *fileName)
+{
+    return [[NSString stringWithFormat:@"%@/%s", [[NSBundle mainBundle] resourcePath], fileName] UTF8String];
+}
+
+
+@interface FModBank : NSObject
+
+@property (nonatomic, readwrite, assign) FMOD::Studio::Bank* bankPointer;
+
+@end
+
+@interface FModEvent ()
+
+@property (nonatomic, readwrite, assign) FMOD::Studio::EventDescription* eventDescriptionPointer;
+@property (nonatomic, readwrite, assign) FMOD::Studio::EventInstance* eventInstancePointer;
+
+@end
+
+@interface FModCapsule ()
 {
     FMOD::System     *system;
     FMOD::Sound      *sound, *sound_to_play;
@@ -21,15 +37,89 @@
     void             *extradriverdata;
     int               numsubsounds;
 }
++(FModCapsule *)sharedSingleton;
+@property (nonatomic, readwrite, assign) FMOD::Studio::System* fmodsystem;
+@property (nonatomic, readwrite, assign) FMOD::Studio::Bank* localBank;
+@property NSMutableArray* loadedBanks;
+@property NSMutableArray* loadedEvents;
+
 @end
 
 
-#define ERROR_CHECK(_result)   if (result != FMOD_OK){\
-    NSLog(@"%@",[NSString stringWithUTF8String:FMOD_ErrorString(result)]);\
-    return;\
+@implementation FModBank
+@synthesize bankPointer = _bankPointer;
+
++(id)bankWithPath:(NSString*)bankPath {
+    
+    FModBank* newBank = [[FModBank alloc] init];
+    
+    if (newBank) {
+        FMOD::Studio::Bank* newBankPointer = NULL;
+        
+        [FModCapsule sharedSingleton].fmodsystem->loadBankFile(GetMediaPath([bankPath UTF8String]), FMOD_STUDIO_LOAD_BANK_NONBLOCKING, &newBankPointer);
+        newBank.bankPointer = newBankPointer;
+        [FModCapsule sharedSingleton].localBank = newBankPointer;
+        
+    }
+    
+    return newBank;
 }
 
+
+@end
+
+@implementation FModEvent
+@synthesize eventDescriptionPointer = _eventDescriptionPointer;
+@synthesize eventInstancePointer = _eventInstancePointer;
+
+-(id)playBankWithPath:(NSString*)eventPath {
+    
+    FModEvent* newEvent = [[FModEvent alloc] init];
+    
+    if (newEvent) {
+        FMOD_STUDIO_LOADING_STATE state;
+        FMOD::Studio::ID eventID = {0};
+        [FModCapsule sharedSingleton].fmodsystem->lookupID([eventPath UTF8String], &eventID);
+        FMOD::Studio::EventDescription* newEventPointer = NULL;
+        [FModCapsule sharedSingleton].fmodsystem->getEventByID(&eventID, &newEventPointer);
+        newEventPointer->loadSampleData();
+        newEvent.eventDescriptionPointer = newEventPointer;
+        FMOD::Studio::EventInstance* newEventInstance = NULL;
+        newEvent.eventDescriptionPointer->createInstance(&newEventInstance);
+        
+        newEvent.eventInstancePointer = newEventInstance;
+        if(newEvent.eventInstancePointer != NULL) {
+            newEvent.eventInstancePointer->start();
+        }
+    }
+    
+    return newEvent;
+}
+
+-(void)play {
+    if (_eventInstancePointer == NULL && _eventDescriptionPointer != NULL) {
+        
+        FMOD::Studio::EventInstance* newEventInstance = NULL;
+        _eventDescriptionPointer->createInstance(&newEventInstance);
+        
+        _eventInstancePointer = newEventInstance;
+    }
+    
+    if(_eventInstancePointer != NULL) {
+        _eventInstancePointer->start();
+    }
+}
+
+-(void)stop {
+    _eventInstancePointer->stop(FMOD_STUDIO_STOP_ALLOWFADEOUT);
+}
+
+
+
+@end
+
 @implementation FModCapsule
+@synthesize fmodsystem = _fmodsystem;
 
 -(instancetype)init
 {
@@ -48,10 +138,10 @@
     result = FMOD_OK;
     
     result = FMOD::System_Create(&system);
-    ERROR_CHECK(result);
+   
     
     result = system->getVersion(&version);
-    ERROR_CHECK(result);
+   
     
     if (version < FMOD_VERSION)
     {
@@ -62,7 +152,7 @@
     Common_Init(&extradriverdata);
     
     result = system->init(32, FMOD_INIT_NORMAL, extradriverdata);
-    ERROR_CHECK(result);
+   
 }
 
 -(void)playStreamWithFilePath:(NSString *)filePath
@@ -70,15 +160,15 @@
     [self releaseSound];
     
     result = system->createStream(filePath.UTF8String, FMOD_LOOP_NORMAL | FMOD_2D, 0, &sound);
-    ERROR_CHECK(result);
-
+   
+    
     result = sound->getNumSubSounds(&numsubsounds);
-    ERROR_CHECK(result);
+   
     
     if (numsubsounds)
     {
         sound->getSubSound(0, &sound_to_play);
-        ERROR_CHECK(result);
+       
     }
     else
     {
@@ -86,7 +176,7 @@
     }
     
     result = system->playSound(sound_to_play, 0, false, &channel);
-    ERROR_CHECK(result);
+   
 }
 -(void)play
 {
@@ -124,7 +214,7 @@
     if(sound)
     {
         result = sound->release();
-        ERROR_CHECK(result);
+       
         sound = 0;
     }
 }
@@ -133,10 +223,10 @@
     if(system)
     {
         result = system->close();
-        ERROR_CHECK(result);
+       
         
         result = system->release();
-        ERROR_CHECK(result);
+       
     }
 }
 -(void)stop
@@ -158,4 +248,64 @@
     }
     return NO;
 }
+
+//Static singleton access
++(FModCapsule *)sharedSingleton
+{
+    static FModCapsule *sharedSingleton;
+    
+    @synchronized(self)
+    {
+        if (!sharedSingleton) {
+            sharedSingleton = [[FModCapsule alloc] init];
+            sharedSingleton.loadedBanks = [NSMutableArray array];
+            sharedSingleton.loadedEvents = [NSMutableArray array];
+        }
+        
+        return sharedSingleton;
+    }
+}
+
+
++(CADisplayLink *)displayLink
+{
+    static CADisplayLink* displayLink = nil;
+    
+    if (displayLink == nil)
+    {
+        displayLink = [CADisplayLink displayLinkWithTarget:[FModCapsule sharedSingleton] selector:@selector(update)];
+    }
+    
+    return displayLink;
+}
+
+
+-(void)update
+{
+    [FModCapsule sharedSingleton].fmodsystem->update();
+}
+
+
+-(void)initializeFModSystem
+{
+    FMOD::Studio::System* newSystem;
+    
+    FMOD::Studio::System::create(&newSystem);
+    newSystem->initialize(32, FMOD_STUDIO_INIT_NORMAL, FMOD_INIT_NORMAL, NULL);
+    
+    [[FModCapsule displayLink] addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+    
+    [FModCapsule sharedSingleton].fmodsystem = newSystem;
+}
+
+-(void)loadBankWithPath:(NSString*)bankPath
+{
+    FModBank* bank = [FModBank bankWithPath:bankPath];
+    if (bank.bankPointer){
+        [[FModCapsule sharedSingleton].loadedBanks addObject:bank];
+    }
+}
+
+
+
 @end
