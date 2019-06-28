@@ -113,7 +113,7 @@ const char *GetMediaPath(const char *fileName)
 }
     
 -(void)stop {
-    newEvent.eventInstancePointer->stop(FMOD_STUDIO_STOP_ALLOWFADEOUT);
+    newEvent.eventInstancePointer->stop(FMOD_STUDIO_STOP_IMMEDIATE);
 }
     
     
