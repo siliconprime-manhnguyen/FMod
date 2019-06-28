@@ -39,7 +39,7 @@ void Common_Init(void **extraDriverData)
     channels = [session respondsToSelector:@selector(maximumOutputNumberOfChannels)] ? [session maximumOutputNumberOfChannels] : 2;
     
     // Deactivate the session so we can change parameters without route changes each time
-    success = [session setActive:FALSE error:nil];
+    success = [session setActive:TRUE error:nil];
     assert(success);
     
     // Set the duration and channels based on known supported values

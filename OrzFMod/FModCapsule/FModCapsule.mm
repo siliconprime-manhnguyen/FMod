@@ -299,6 +299,10 @@ const char *GetMediaPath(const char *fileName)
         
         [FModCapsule sharedSingleton].fmodsystem = newSystem;
     }
+-(void)releaseSystemFmod
+    {
+        [FModCapsule sharedSingleton].fmodsystem->release();
+    }
     
 -(void)loadBankWithPath:(NSString*)bankPath
     {

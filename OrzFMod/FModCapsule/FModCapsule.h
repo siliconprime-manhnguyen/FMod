@@ -17,7 +17,7 @@
 @end
 
 @interface FModCapsule : NSObject
-
+-(void)releaseSystemFmod;
 -(void)initializeFModSystem;
 -(void)loadBankWithPath:(NSString*)bankPath;
 -(void)playStreamWithFilePath:(NSString *)filePath;
