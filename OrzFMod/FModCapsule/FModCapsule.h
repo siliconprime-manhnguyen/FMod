@@ -10,7 +10,7 @@
 
 @interface FModEvent : NSObject
 
--(id)playBankWithPath:(NSString*)eventName;
+-(id)playBankWithPath:(NSString*)eventPath volume:(float)volume;
 -(void)play;
 -(void)stop;
 
@@ -26,5 +26,6 @@
 -(void)stop;
 -(void)close;
 -(BOOL)isPlaying;
+-(int)getEventLength:(NSString*)eventPath;
 
 @end

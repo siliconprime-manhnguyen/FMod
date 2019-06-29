@@ -15,40 +15,40 @@ const char *GetMediaPath(const char *fileName)
 
 
 @interface FModBank : NSObject
-    
-    @property (nonatomic, readwrite, assign) FMOD::Studio::Bank* bankPointer;
-    
-    @end
+
+@property (nonatomic, readwrite, assign) FMOD::Studio::Bank* bankPointer;
+
+@end
 
 @interface FModEvent ()
-    
-    @property (nonatomic, readwrite, assign) FMOD::Studio::EventDescription* eventDescriptionPointer;
-    @property (nonatomic, readwrite, assign) FMOD::Studio::EventInstance* eventInstancePointer;
-    
-    @end
+
+@property (nonatomic, readwrite, assign) FMOD::Studio::EventDescription* eventDescriptionPointer;
+@property (nonatomic, readwrite, assign) FMOD::Studio::EventInstance* eventInstancePointer;
+
+@end
 
 @interface FModCapsule ()
-    {
-        FMOD::System     *system;
-        FMOD::Sound      *sound, *sound_to_play;
-        FMOD::Channel    *channel;
-        FMOD_RESULT       result;
-        unsigned int      version;
-        void             *extradriverdata;
-        int               numsubsounds;
-    }
+{
+    FMOD::System     *system;
+    FMOD::Sound      *sound, *sound_to_play;
+    FMOD::Channel    *channel;
+    FMOD_RESULT       result;
+    unsigned int      version;
+    void             *extradriverdata;
+    int               numsubsounds;
+}
 +(FModCapsule *)sharedSingleton;
-    @property (nonatomic, readwrite, assign) FMOD::Studio::System* fmodsystem;
-    @property (nonatomic, readwrite, assign) FMOD::Studio::Bank* localBank;
-    @property NSMutableArray* loadedBanks;
-    @property NSMutableArray* loadedEvents;
-    
-    @end
+@property (nonatomic, readwrite, assign) FMOD::Studio::System* fmodsystem;
+@property (nonatomic, readwrite, assign) FMOD::Studio::Bank* localBank;
+@property NSMutableArray* loadedBanks;
+@property NSMutableArray* loadedEvents;
+
+@end
 
 
 @implementation FModBank
-    @synthesize bankPointer = _bankPointer;
-    
+@synthesize bankPointer = _bankPointer;
+
 +(id)bankWithPath:(NSString*)bankPath {
     
     FModBank* newBank = [[FModBank alloc] init];
@@ -64,16 +64,15 @@ const char *GetMediaPath(const char *fileName)
     
     return newBank;
 }
-    
-    
-    @end
+
+
+@end
 
 @implementation FModEvent
-    @synthesize eventDescriptionPointer = _eventDescriptionPointer;
-    @synthesize eventInstancePointer = _eventInstancePointer;
-    FModEvent* newEvent = [[FModEvent alloc] init];
--(id)playBankWithPath:(NSString*)eventPath {
-    
+@synthesize eventDescriptionPointer = _eventDescriptionPointer;
+@synthesize eventInstancePointer = _eventInstancePointer;
+FModEvent* newEvent = [[FModEvent alloc] init];
+-(id)playBankWithPath:(NSString*)eventPath volume:(float)volume{
     
     if (newEvent) {
         FMOD_STUDIO_LOADING_STATE state;
@@ -91,13 +90,14 @@ const char *GetMediaPath(const char *fileName)
         
         newEvent.eventInstancePointer = newEventInstance;
         if(newEvent.eventInstancePointer != NULL) {
+            newEvent.eventInstancePointer->setVolume(volume);
             newEvent.eventInstancePointer->start();
         }
     }
     
     return newEvent;
 }
-    
+
 -(void)play {
     if (_eventInstancePointer == NULL && _eventDescriptionPointer != NULL) {
         
@@ -111,27 +111,27 @@ const char *GetMediaPath(const char *fileName)
         _eventInstancePointer->start();
     }
 }
-    
+
 -(void)stop {
     newEvent.eventInstancePointer->stop(FMOD_STUDIO_STOP_IMMEDIATE);
 }
-    
-    
-    
-    @end
+
+
+
+@end
 
 @implementation FModCapsule
-    @synthesize fmodsystem = _fmodsystem;
-    
+@synthesize fmodsystem = _fmodsystem;
+
 -(instancetype)init
+{
+    if(self = [super init])
     {
-        if(self = [super init])
-        {
-            [self createSystem];
-        }
-        return self;
+        [self createSystem];
     }
-    
+    return self;
+}
+
 -(void)createSystem {
     
     channel = 0;
@@ -156,62 +156,62 @@ const char *GetMediaPath(const char *fileName)
     result = system->init(32, FMOD_INIT_NORMAL, extradriverdata);
     
 }
-    
+
 -(void)playStreamWithFilePath:(NSString *)filePath
+{
+    [self releaseSound];
+    
+    result = system->createStream(filePath.UTF8String, FMOD_LOOP_NORMAL | FMOD_2D, 0, &sound);
+    
+    
+    result = sound->getNumSubSounds(&numsubsounds);
+    
+    
+    if (numsubsounds)
     {
-        [self releaseSound];
-        
-        result = system->createStream(filePath.UTF8String, FMOD_LOOP_NORMAL | FMOD_2D, 0, &sound);
-        
-        
-        result = sound->getNumSubSounds(&numsubsounds);
-        
-        
-        if (numsubsounds)
-        {
-            sound->getSubSound(0, &sound_to_play);
-            
-        }
-        else
-        {
-            sound_to_play = sound;
-        }
-        
-        result = system->playSound(sound_to_play, 0, false, &channel);
+        sound->getSubSound(0, &sound_to_play);
         
     }
+    else
+    {
+        sound_to_play = sound;
+    }
+    
+    result = system->playSound(sound_to_play, 0, false, &channel);
+    
+}
 -(void)play
+{
+    if(channel)
     {
-        if(channel)
+        bool isPaused = false;
+        channel->getPaused(&isPaused);
+        if(isPaused)
         {
-            bool isPaused = false;
-            channel->getPaused(&isPaused);
-            if(isPaused)
-            {
-                channel->setPaused(false);
-            }
+            channel->setPaused(false);
         }
     }
-    
+}
+
 -(void)pause
+{
+    if(channel)
     {
-        if(channel)
+        bool isPlaying = false;
+        channel->isPlaying(&isPlaying);
+        if(isPlaying)
         {
-            bool isPlaying = false;
-            channel->isPlaying(&isPlaying);
-            if(isPlaying)
-            {
-                channel->setPaused(true);
-            }
-            
+            channel->setPaused(true);
         }
+        
     }
+}
 -(void)close
-    {
-        [self releaseSound];
-        [self releaseSystem];
-    }
-    
+{
+    [self releaseSound];
+    [self releaseSystem];
+}
+
 -(void)releaseSound {
     if(sound)
     {
@@ -220,7 +220,7 @@ const char *GetMediaPath(const char *fileName)
         sound = 0;
     }
 }
-    
+
 -(void)releaseSystem {
     if(system)
     {
@@ -232,13 +232,13 @@ const char *GetMediaPath(const char *fileName)
     }
 }
 -(void)stop
+{
+    if(channel)
     {
-        if(channel)
-        {
-            channel->stop();
-        }
+        channel->stop();
     }
-    
+}
+
 -(BOOL)isPlaying {
     if(channel)
     {
@@ -250,68 +250,77 @@ const char *GetMediaPath(const char *fileName)
     }
     return NO;
 }
-    
-    //Static singleton access
+
+//Static singleton access
 +(FModCapsule *)sharedSingleton
+{
+    static FModCapsule *sharedSingleton;
+    
+    @synchronized(self)
     {
-        static FModCapsule *sharedSingleton;
-        
-        @synchronized(self)
-        {
-            if (!sharedSingleton) {
-                sharedSingleton = [[FModCapsule alloc] init];
-                sharedSingleton.loadedBanks = [NSMutableArray array];
-                sharedSingleton.loadedEvents = [NSMutableArray array];
-            }
-            
-            return sharedSingleton;
+        if (!sharedSingleton) {
+            sharedSingleton = [[FModCapsule alloc] init];
+            sharedSingleton.loadedBanks = [NSMutableArray array];
+            sharedSingleton.loadedEvents = [NSMutableArray array];
         }
+        
+        return sharedSingleton;
     }
-    
-    
+}
+
+
 +(CADisplayLink *)displayLink
+{
+    static CADisplayLink* displayLink = nil;
+    
+    if (displayLink == nil)
     {
-        static CADisplayLink* displayLink = nil;
-        
-        if (displayLink == nil)
-        {
-            displayLink = [CADisplayLink displayLinkWithTarget:[FModCapsule sharedSingleton] selector:@selector(update)];
-        }
-        
-        return displayLink;
+        displayLink = [CADisplayLink displayLinkWithTarget:[FModCapsule sharedSingleton] selector:@selector(update)];
     }
     
-    
+    return displayLink;
+}
+
+
 -(void)update
-    {
-        [FModCapsule sharedSingleton].fmodsystem->update();
-    }
-    
-    
+{
+    [FModCapsule sharedSingleton].fmodsystem->update();
+}
+
+
 -(void)initializeFModSystem
-    {
-        FMOD::Studio::System* newSystem;
-        
-        FMOD::Studio::System::create(&newSystem);
-        newSystem->initialize(32, FMOD_STUDIO_INIT_NORMAL, FMOD_INIT_NORMAL, NULL);
-        
-        [[FModCapsule displayLink] addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-        
-        [FModCapsule sharedSingleton].fmodsystem = newSystem;
-    }
+{
+    FMOD::Studio::System* newSystem;
+    
+    FMOD::Studio::System::create(&newSystem);
+    newSystem->initialize(32, FMOD_STUDIO_INIT_NORMAL, FMOD_INIT_NORMAL, NULL);
+    
+    [[FModCapsule displayLink] addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+    
+    [FModCapsule sharedSingleton].fmodsystem = newSystem;
+}
 -(void)releaseSystemFmod
-    {
-        [FModCapsule sharedSingleton].fmodsystem->release();
-    }
-    
+{
+    [FModCapsule sharedSingleton].fmodsystem->release();
+}
+
 -(void)loadBankWithPath:(NSString*)bankPath
-    {
-        FModBank* bank = [FModBank bankWithPath:bankPath];
-        if (bank.bankPointer){
-            [[FModCapsule sharedSingleton].loadedBanks addObject:bank];
-        }
+{
+    FModBank* bank = [FModBank bankWithPath:bankPath];
+    if (bank.bankPointer){
+        [[FModCapsule sharedSingleton].loadedBanks addObject:bank];
     }
-    
-    
-    
-    @end
+}
+
+-(int)getEventLength:(NSString*)eventPath {
+    FMOD::Studio::ID eventID = {0};
+    FMOD::Studio::EventDescription* newEventPointer = NULL;
+    [FModCapsule sharedSingleton].fmodsystem->lookupID([eventPath UTF8String], &eventID);
+    [FModCapsule sharedSingleton].fmodsystem->getEventByID(&eventID, &newEventPointer);
+    int length;
+    newEventPointer->getLength(&length);
+    return length;
+}
+
+
+@end
