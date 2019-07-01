@@ -99,16 +99,14 @@ FModEvent* newEvent = [[FModEvent alloc] init];
 }
 
 -(void)play {
-    if (_eventInstancePointer == NULL && _eventDescriptionPointer != NULL) {
-        
+    if (newEvent.eventInstancePointer == NULL && newEvent.eventDescriptionPointer != NULL) {
         FMOD::Studio::EventInstance* newEventInstance = NULL;
-        _eventDescriptionPointer->createInstance(&newEventInstance);
-        
-        _eventInstancePointer = newEventInstance;
+        newEvent.eventDescriptionPointer->createInstance(&newEventInstance);
+        newEvent.eventInstancePointer = newEventInstance;
     }
     
-    if(_eventInstancePointer != NULL) {
-        _eventInstancePointer->start();
+    if(newEvent.eventInstancePointer != NULL) {
+        newEvent.eventInstancePointer->start();
     }
 }
 
