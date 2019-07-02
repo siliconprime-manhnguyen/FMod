@@ -1,7 +1,7 @@
 
 
 #import "FModCapsule.h"
-#include "fmod_studio.hpp"
+#include "FModAPI/api/studio/inc/fmod_studio.hpp"
 #include "fmod.hpp"
 #include "common.h"
 #include "fmod_errors.h"
@@ -59,7 +59,6 @@ const char *GetMediaPath(const char *fileName)
         [FModCapsule sharedSingleton].fmodsystem->loadBankFile(GetMediaPath([bankPath UTF8String]), FMOD_STUDIO_LOAD_BANK_NONBLOCKING, &newBankPointer);
         newBank.bankPointer = newBankPointer;
         [FModCapsule sharedSingleton].localBank = newBankPointer;
-        
     }
     
     return newBank;
@@ -71,47 +70,38 @@ const char *GetMediaPath(const char *fileName)
 @implementation FModEvent
 @synthesize eventDescriptionPointer = _eventDescriptionPointer;
 @synthesize eventInstancePointer = _eventInstancePointer;
-FModEvent* newEvent = [[FModEvent alloc] init];
--(id)playBankWithPath:(NSString*)eventPath volume:(float)volume{
+
+-(void)playBankWithPath:(NSString*)eventPath volume:(float)volume{
+    FMOD::Studio::ID eventID = {0};
+    [FModCapsule sharedSingleton].fmodsystem->lookupID([eventPath UTF8String], &eventID);
+    FMOD::Studio::EventDescription* newEventPointer = NULL;
+    [FModCapsule sharedSingleton].fmodsystem->getEventByID(&eventID, &newEventPointer);
+    newEventPointer->loadSampleData();
+    _eventDescriptionPointer = newEventPointer;
+    FMOD::Studio::EventInstance* newEventInstance = NULL;
+    _eventDescriptionPointer->createInstance(&newEventInstance);
     
-    if (newEvent) {
-        FMOD_STUDIO_LOADING_STATE state;
-        FMOD::Studio::ID eventID = {0};
-        int count;
-        [FModCapsule sharedSingleton].fmodsystem->lookupID([eventPath UTF8String], &eventID);
-        [FModCapsule sharedSingleton].localBank->getEventCount(&count);
-        [FModCapsule sharedSingleton].localBank->getLoadingState(&state);
-        FMOD::Studio::EventDescription* newEventPointer = NULL;
-        [FModCapsule sharedSingleton].fmodsystem->getEventByID(&eventID, &newEventPointer);
-        newEventPointer->loadSampleData();
-        newEvent.eventDescriptionPointer = newEventPointer;
-        FMOD::Studio::EventInstance* newEventInstance = NULL;
-        newEvent.eventDescriptionPointer->createInstance(&newEventInstance);
-        
-        newEvent.eventInstancePointer = newEventInstance;
-        if(newEvent.eventInstancePointer != NULL) {
-            newEvent.eventInstancePointer->setVolume(volume);
-            newEvent.eventInstancePointer->start();
-        }
+    _eventInstancePointer = newEventInstance;
+    if(_eventInstancePointer != NULL) {
+        _eventInstancePointer->setVolume(volume);
+        _eventInstancePointer->start();
     }
-    
-    return newEvent;
 }
 
 -(void)play {
-    if (newEvent.eventInstancePointer == NULL && newEvent.eventDescriptionPointer != NULL) {
+    if (_eventInstancePointer == NULL) {
         FMOD::Studio::EventInstance* newEventInstance = NULL;
-        newEvent.eventDescriptionPointer->createInstance(&newEventInstance);
-        newEvent.eventInstancePointer = newEventInstance;
+        _eventDescriptionPointer->createInstance(&newEventInstance);
+        _eventInstancePointer = newEventInstance;
     }
     
-    if(newEvent.eventInstancePointer != NULL) {
-        newEvent.eventInstancePointer->start();
+    if(_eventInstancePointer != NULL) {
+        _eventInstancePointer->start();
     }
 }
 
 -(void)stop {
-    newEvent.eventInstancePointer->stop(FMOD_STUDIO_STOP_IMMEDIATE);
+    _eventInstancePointer->stop(FMOD_STUDIO_STOP_IMMEDIATE);
 }
 
 
@@ -152,7 +142,6 @@ FModEvent* newEvent = [[FModEvent alloc] init];
     Common_Init(&extradriverdata);
     
     result = system->init(32, FMOD_INIT_NORMAL, extradriverdata);
-    
 }
 
 -(void)playStreamWithFilePath:(NSString *)filePath
@@ -288,15 +277,21 @@ FModEvent* newEvent = [[FModEvent alloc] init];
 
 -(void)initializeFModSystem
 {
+    //    extradriverdata = 0;
+    
     FMOD::Studio::System* newSystem;
     
     FMOD::Studio::System::create(&newSystem);
+    
+    //    Common_Init(&extradriverdata);
+    
     newSystem->initialize(32, FMOD_STUDIO_INIT_NORMAL, FMOD_INIT_NORMAL, NULL);
     
     [[FModCapsule displayLink] addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     
     [FModCapsule sharedSingleton].fmodsystem = newSystem;
 }
+
 -(void)releaseSystemFmod
 {
     [FModCapsule sharedSingleton].fmodsystem->release();

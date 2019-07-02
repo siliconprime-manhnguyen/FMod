@@ -10,13 +10,15 @@
 
 @interface FModEvent : NSObject
 
--(id)playBankWithPath:(NSString*)eventPath volume:(float)volume;
+-(void)playBankWithPath:(NSString*)eventPath volume:(float)volume;
 -(void)play;
 -(void)stop;
 
 @end
 
 @interface FModCapsule : NSObject
++(FModCapsule *)sharedSingleton;
+
 -(void)releaseSystemFmod;
 -(void)initializeFModSystem;
 -(void)loadBankWithPath:(NSString*)bankPath;
@@ -26,6 +28,7 @@
 -(void)stop;
 -(void)close;
 -(BOOL)isPlaying;
+-(void)update;
 -(int)getEventLength:(NSString*)eventPath;
 
 @end
