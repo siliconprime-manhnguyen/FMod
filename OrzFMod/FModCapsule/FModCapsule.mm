@@ -1,11 +1,11 @@
 
 
 #import "FModCapsule.h"
-#include "FModAPI/api/studio/inc/fmod_studio.hpp"
+#include "fmod_studio.hpp"
 #include "fmod.hpp"
 #include "common.h"
 #include "fmod_errors.h"
-
+#import <AVFoundation/AVAudioSession.h>
 
 
 const char *GetMediaPath(const char *fileName)
@@ -56,14 +56,14 @@ const char *GetMediaPath(const char *fileName)
     if (newBank) {
         FMOD::Studio::Bank* newBankPointer = NULL;
         
-        [FModCapsule sharedSingleton].fmodsystem->loadBankFile(GetMediaPath([bankPath UTF8String]), FMOD_STUDIO_LOAD_BANK_NONBLOCKING, &newBankPointer);
+        [FModCapsule sharedSingleton].fmodsystem->loadBankFile([bankPath UTF8String], FMOD_STUDIO_LOAD_BANK_NORMAL, &newBankPointer);
+        newBankPointer->loadSampleData();
         newBank.bankPointer = newBankPointer;
         [FModCapsule sharedSingleton].localBank = newBankPointer;
     }
     
     return newBank;
 }
-
 
 @end
 
@@ -72,11 +72,9 @@ const char *GetMediaPath(const char *fileName)
 @synthesize eventInstancePointer = _eventInstancePointer;
 
 -(void)playBankWithPath:(NSString*)eventPath volume:(float)volume{
-    FMOD::Studio::ID eventID = {0};
-    [FModCapsule sharedSingleton].fmodsystem->lookupID([eventPath UTF8String], &eventID);
     FMOD::Studio::EventDescription* newEventPointer = NULL;
-    [FModCapsule sharedSingleton].fmodsystem->getEventByID(&eventID, &newEventPointer);
-    newEventPointer->loadSampleData();
+    [FModCapsule sharedSingleton].fmodsystem->getEvent([eventPath UTF8String], &newEventPointer);
+//    newEventPointer->loadSampleData();
     _eventDescriptionPointer = newEventPointer;
     FMOD::Studio::EventInstance* newEventInstance = NULL;
     _eventDescriptionPointer->createInstance(&newEventInstance);
@@ -85,6 +83,7 @@ const char *GetMediaPath(const char *fileName)
     if(_eventInstancePointer != NULL) {
         _eventInstancePointer->setVolume(volume);
         _eventInstancePointer->start();
+        [[FModCapsule sharedSingleton] update];
     }
 }
 
@@ -97,14 +96,19 @@ const char *GetMediaPath(const char *fileName)
     
     if(_eventInstancePointer != NULL) {
         _eventInstancePointer->start();
+        [[FModCapsule sharedSingleton] update];
     }
 }
 
 -(void)stop {
     _eventInstancePointer->stop(FMOD_STUDIO_STOP_IMMEDIATE);
+    [[FModCapsule sharedSingleton] update];
 }
 
-
+-(void)releaseSound {
+    _eventInstancePointer->release();
+    _eventDescriptionPointer->releaseAllInstances();
+}
 
 @end
 
@@ -115,127 +119,8 @@ const char *GetMediaPath(const char *fileName)
 {
     if(self = [super init])
     {
-        [self createSystem];
     }
     return self;
-}
-
--(void)createSystem {
-    
-    channel = 0;
-    extradriverdata = 0;
-    sound = 0;
-    result = FMOD_OK;
-    
-    result = FMOD::System_Create(&system);
-    
-    
-    result = system->getVersion(&version);
-    
-    
-    if (version < FMOD_VERSION)
-    {
-        NSLog(@"FMOD lib version %08x doesn't match header version %08x", version, FMOD_VERSION);
-        return;
-    }
-    
-    Common_Init(&extradriverdata);
-    
-    result = system->init(32, FMOD_INIT_NORMAL, extradriverdata);
-}
-
--(void)playStreamWithFilePath:(NSString *)filePath
-{
-    [self releaseSound];
-    
-    result = system->createStream(filePath.UTF8String, FMOD_LOOP_NORMAL | FMOD_2D, 0, &sound);
-    
-    
-    result = sound->getNumSubSounds(&numsubsounds);
-    
-    
-    if (numsubsounds)
-    {
-        sound->getSubSound(0, &sound_to_play);
-        
-    }
-    else
-    {
-        sound_to_play = sound;
-    }
-    
-    result = system->playSound(sound_to_play, 0, false, &channel);
-    
-}
--(void)play
-{
-    if(channel)
-    {
-        bool isPaused = false;
-        channel->getPaused(&isPaused);
-        if(isPaused)
-        {
-            channel->setPaused(false);
-        }
-    }
-}
-
--(void)pause
-{
-    if(channel)
-    {
-        bool isPlaying = false;
-        channel->isPlaying(&isPlaying);
-        if(isPlaying)
-        {
-            channel->setPaused(true);
-        }
-        
-    }
-}
--(void)close
-{
-    [self releaseSound];
-    [self releaseSystem];
-}
-
--(void)releaseSound {
-    if(sound)
-    {
-        result = sound->release();
-        
-        sound = 0;
-    }
-}
-
--(void)releaseSystem {
-    if(system)
-    {
-        result = system->close();
-        
-        
-        result = system->release();
-        
-    }
-}
--(void)stop
-{
-    if(channel)
-    {
-        channel->stop();
-    }
-}
-
--(BOOL)isPlaying {
-    if(channel)
-    {
-        bool isPlaying = false;
-        channel->isPlaying(&isPlaying);
-        if(isPlaying) {
-            return YES;
-        }
-    }
-    return NO;
 }
 
 //Static singleton access
@@ -277,23 +162,24 @@ const char *GetMediaPath(const char *fileName)
 
 -(void)initializeFModSystem
 {
-    //    extradriverdata = 0;
-    
     FMOD::Studio::System* newSystem;
     
     FMOD::Studio::System::create(&newSystem);
     
-    //    Common_Init(&extradriverdata);
-    
     newSystem->initialize(32, FMOD_STUDIO_INIT_NORMAL, FMOD_INIT_NORMAL, NULL);
-    
-    [[FModCapsule displayLink] addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
     
     [FModCapsule sharedSingleton].fmodsystem = newSystem;
 }
 
 -(void)releaseSystemFmod
 {
+    for (int i = 0; i < [FModCapsule sharedSingleton].loadedBanks.count; i++) {
+        FModBank* bank = (FModBank*)[FModCapsule sharedSingleton].loadedBanks[i];
+        bank.bankPointer->unloadSampleData();
+        bank.bankPointer->unload();
+    }
+    [FModCapsule sharedSingleton].fmodsystem->unloadAll();
+    [FModCapsule sharedSingleton].fmodsystem->flushCommands();
     [FModCapsule sharedSingleton].fmodsystem->release();
 }
 

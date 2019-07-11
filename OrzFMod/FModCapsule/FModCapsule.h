@@ -13,7 +13,7 @@
 -(void)playBankWithPath:(NSString*)eventPath volume:(float)volume;
 -(void)play;
 -(void)stop;
-
+-(void)releaseSound;
 @end
 
 @interface FModCapsule : NSObject
@@ -22,12 +22,6 @@
 -(void)releaseSystemFmod;
 -(void)initializeFModSystem;
 -(void)loadBankWithPath:(NSString*)bankPath;
--(void)playStreamWithFilePath:(NSString *)filePath;
--(void)play;
--(void)pause;
--(void)stop;
--(void)close;
--(BOOL)isPlaying;
 -(void)update;
 -(int)getEventLength:(NSString*)eventPath;
 
