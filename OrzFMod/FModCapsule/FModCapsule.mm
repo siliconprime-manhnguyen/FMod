@@ -74,7 +74,6 @@ const char *GetMediaPath(const char *fileName)
 -(void)playBankWithPath:(NSString*)eventPath volume:(float)volume{
     FMOD::Studio::EventDescription* newEventPointer = NULL;
     [FModCapsule sharedSingleton].fmodsystem->getEvent([eventPath UTF8String], &newEventPointer);
-//    newEventPointer->loadSampleData();
     _eventDescriptionPointer = newEventPointer;
     FMOD::Studio::EventInstance* newEventInstance = NULL;
     _eventDescriptionPointer->createInstance(&newEventInstance);
@@ -87,7 +86,7 @@ const char *GetMediaPath(const char *fileName)
     }
 }
 
--(void)play {
+-(void)play:(float)volume {
     if (_eventInstancePointer == NULL) {
         FMOD::Studio::EventInstance* newEventInstance = NULL;
         _eventDescriptionPointer->createInstance(&newEventInstance);
@@ -95,6 +94,7 @@ const char *GetMediaPath(const char *fileName)
     }
     
     if(_eventInstancePointer != NULL) {
+        _eventInstancePointer->setVolume(volume);
         _eventInstancePointer->start();
         [[FModCapsule sharedSingleton] update];
     }

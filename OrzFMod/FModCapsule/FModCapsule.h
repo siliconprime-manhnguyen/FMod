@@ -11,7 +11,7 @@
 @interface FModEvent : NSObject
 
 -(void)playBankWithPath:(NSString*)eventPath volume:(float)volume;
--(void)play;
+-(void)play:(float)volume;
 -(void)stop;
 -(void)releaseSound;
 @end
