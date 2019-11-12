@@ -56,7 +56,8 @@ const char *GetMediaPath(const char *fileName)
     if (newBank) {
         FMOD::Studio::Bank* newBankPointer = NULL;
         
-        [FModCapsule sharedSingleton].fmodsystem->loadBankFile([bankPath UTF8String], FMOD_STUDIO_LOAD_BANK_NORMAL, &newBankPointer);
+        [FModCapsule sharedSingleton].fmodsystem->loadBankFile([bankPath UTF8String], FMOD_STUDIO_LOAD_BANK_NONBLOCKING, &newBankPointer);
+        [FModCapsule sharedSingleton].fmodsystem->flushCommands();
         newBankPointer->loadSampleData();
         newBank.bankPointer = newBankPointer;
         [FModCapsule sharedSingleton].localBank = newBankPointer;
